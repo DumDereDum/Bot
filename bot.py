@@ -3,12 +3,16 @@ import re
 import subprocess
 import sys
 from telebot import apihelper
+import time, timelib
+from datetime import datetime
+import sqlite3
 
 def replace_all(t, d):
     """Общая функция для подмены переменных"""
     for i, j in d.items():
         t = t.replace(i, j, 1)
     return t
+
 def get_datex(text):
     """Извлекает из текста дату и подстроку с датой, которую нужно удалить"""
     whatdate = ''
@@ -48,11 +52,28 @@ def get_clock(text):
         delclock = clock[0]
     return (how, delclock)
 
-def add_task(out, x, id):
-    cmd = 'echo "task %s %s" | %s' % (out, id, x)
-    subprocess.Popen(cmd, shell=True)
+def add_task(out, x, chat):
+    print (x)
+    with sqlite3.connect("reminders.db") as con:
+        cursor = con.cursor()
+        if not x.find('now'):
+            cursor.execute("INSERT INTO tasks VALUES (?, ?, ?)", (out, datetime.fromtimestamp(timelib.strtotime(x.encode('utf-8'))).strftime('%Y-%m-%d %H:%M:%S'), chat))
+        else:
+            cursor.execute("INSERT INTO tasks VALUES (?, ?, ?)", (out, datetime.utcfromtimestamp(timelib.strtotime(x.encode('utf-8'))).strftime('%Y-%m-%d %H:%M:%S'), chat))
+        con.commit()
+    
+def checkTasks (chat):
+    with sqlite3.connect("reminders.db") as con:
+        cursor = con.cursor()
+        data = ""
+        for row in cursor.execute("SELECT * FROM tasks WHERE id="+str(chat)):
+            data += "\n" + row[0] + "в " + row [1]
+        return data
 
 #apihelper.proxy = {'https':'socks5h://45.55.106.89:80'}
+conn = sqlite3.connect("reminders.db")
+
+
 bot = telebot.TeleBot('625199341:AAGuM7KLOKHGUHKv1Xo0-htS8pDu0IUedic')
 
 @bot.message_handler(comands=['start'])
@@ -60,36 +81,38 @@ def start_message(message):
 		bot.send_message(message.chat.id, 'Приветствую')
 @bot.message_handler(content_types=['text'])
 def send_text(message):
-		if message.text == 'Привет': 
-			bot.send_message(message.chat.id, 'Привет, мой господин') 
-		elif message.text == 'Пока': 
-		    bot.send_message(message.chat.id, 'Прощай, господин') 	
-		elif message.text == 'Бот, ты сука': 
-				bot.send_photo(message.chat.id, open('putch\mem.jpg', 'rb') )
-		else:
-				print ("hueta")
-				get = message.text # получаем текст
-				text = get+' ' # добавляем в конец пробел, чтобы отрабатывать уведомления типа "напомнить мне через 10 минут". Если бы пробела не было, параметр clock был бы пуст. В параметре clock после слова "час" тоже стоит пробел, чтобы различать поиск "час" и "часов".
-				find = re.findall('ерез [0-9]+|В [0-9:-]+|в [0-9:-]+|ерез час',text)
-				if get: # убеждаемся, заполнено ли поле ввода
-						if find: # убеждаемся, указано ли время напоминания
-								what = find[0].split()
-								timex = what[1].replace('-',':').replace('час','1')
+        if message.text == 'Привет': 
+            bot.send_message(message.chat.id, 'Привет, мой господин') 
+        elif message.text == 'Пока': 
+            bot.send_message(message.chat.id, 'Прощай, господин')
+        elif message.text == 'че напомнишь?':
+            bot.send_message(message.chat.id, checkTasks(message.chat.id))	
+        elif message.text == 'Бот, ты сука': 
+                bot.send_photo(message.chat.id, open('putch\mem.jpg', 'rb') )
+        else:
+				#print ("hueta")
+                get = message.text # получаем текст
+                text = get+' ' # добавляем в конец пробел, чтобы отрабатывать уведомления типа "напомнить мне через 10 минут". Если бы пробела не было, параметр clock был бы пуст. В параметре clock после слова "час" тоже стоит пробел, чтобы различать поиск "час" и "часов".
+                find = re.findall('ерез [0-9]+|В [0-9:-]+|в [0-9:-]+|ерез час',text)
+                if get: # убеждаемся, заполнено ли поле ввода
+                        if find: # убеждаемся, указано ли время напоминания
+                                what = find[0].split()
+                                timex = what[1].replace('-',':').replace('час','1')
 								
-								if len(timex) > 2: # заменяет выражения типа "в 10" на "в 10:00"
-										time = timex
-								else:
-										time = timex+':00'	
+                                if len(timex) > 2: # заменяет выражения типа "в 10" на "в 10:00"
+                                        time = timex
+                                else:
+                                        time = timex+':00'	
                 
-								whatdate, delwhatdate = get_datex(text)
-								when, delday = get_day(text)
-								how, delclock = get_clock(text)
+                                whatdate, delwhatdate = get_datex(text)
+                                when, delday = get_day(text)
+                                how, delclock = get_clock(text)
 
-								reps = {'ерез':'at now + %s %s' % (timex,how),'В':'at %s %s %s' % (time,when,whatdate),'в':'at %s %s %s' % (time,when,whatdate)}
-								wors = {'Через %s %s' % (what[1],delclock):'','через %s %s' % (what[1],delclock):'','В %s ' % what[1]:'','в %s ' % what[1]:'', '%s' % delday:'', 'Через час':'', 'через час':'', '%s' % delwhatdate:'',} # какие слова мы будем удалять
-								x = replace_all(what[0], reps) # это время, на которое запланировано появление напоминания
-								out = replace_all(text, wors) # это текст напоминания
-								add_task(out, x, message.chat.id)
+                                reps = {'ерез':'now + %s %s' % (timex,how),'В':'%s %s %s' % (when, time,whatdate),'в':'%s %s %s' % (when, time, whatdate)}
+                                wors = {'Через %s %s' % (what[1],delclock):'','через %s %s' % (what[1],delclock):'','В %s ' % what[1]:'','в %s ' % what[1]:'', '%s' % delday:'', 'Через час':'', 'через час':'', '%s' % delwhatdate:'',} # какие слова мы будем удалять
+                                x = replace_all(what[0], reps) # это время, на которое запланировано появление напоминания
+                                out = replace_all(text, wors) # это текст напоминания
+                                add_task(out, x, message.chat.id)
 
 
 bot.polling()
