@@ -79,11 +79,6 @@ def deleteOldReminders():
         cursor = con.cursor()
         cursor.execute("DELETE FROM tasks WHERE date<"+str(time.time()))
 
-
-#apihelper.proxy = {'https':'socks5h://45.55.106.89:80'}
-conn = sqlite3.connect("reminders.db")
-
-
 bot = telebot.TeleBot('625199341:AAGuM7KLOKHGUHKv1Xo0-htS8pDu0IUedic')
 
 @bot.message_handler(comands=['start'])
