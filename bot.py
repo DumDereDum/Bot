@@ -53,22 +53,32 @@ def get_clock(text):
     return (how, delclock)
 
 def add_task(out, x, chat):
-    print (x)
+    #print (x)
     with sqlite3.connect("reminders.db") as con:
         cursor = con.cursor()
-        if not x.find('now'):
-            cursor.execute("INSERT INTO tasks VALUES (?, ?, ?)", (out, datetime.fromtimestamp(timelib.strtotime(x.encode('utf-8'))).strftime('%Y-%m-%d %H:%M:%S'), chat))
+        if 'now' in x:
+            cursor.execute("INSERT INTO tasks VALUES (?, ?, ?)", (out, timelib.strtotime(x.encode('utf-8')), chat))
         else:
-            cursor.execute("INSERT INTO tasks VALUES (?, ?, ?)", (out, datetime.utcfromtimestamp(timelib.strtotime(x.encode('utf-8'))).strftime('%Y-%m-%d %H:%M:%S'), chat))
+            cursor.execute("INSERT INTO tasks VALUES (?, ?, ?)", (out, timelib.strtotime(x.encode('utf-8'))-10800, chat))
         con.commit()
     
 def checkTasks (chat):
+    deleteOldReminders()
     with sqlite3.connect("reminders.db") as con:
         cursor = con.cursor()
         data = ""
         for row in cursor.execute("SELECT * FROM tasks WHERE id="+str(chat)):
-            data += "\n" + row[0] + "в " + row [1]
-        return data
+            data += "\n" + row[0] + "в " + datetime.fromtimestamp(row [1]).strftime('%Y-%m-%d %H:%M:%S')
+        if data:
+            return data
+        else:
+            return "ничего"
+
+def deleteOldReminders():
+     with sqlite3.connect("reminders.db") as con:
+        cursor = con.cursor()
+        cursor.execute("DELETE FROM tasks WHERE date<"+str(time.time()))
+
 
 #apihelper.proxy = {'https':'socks5h://45.55.106.89:80'}
 conn = sqlite3.connect("reminders.db")
@@ -81,16 +91,15 @@ def start_message(message):
 		bot.send_message(message.chat.id, 'Приветствую')
 @bot.message_handler(content_types=['text'])
 def send_text(message):
-        if message.text == 'Привет': 
+        if message.text.lower() == 'привет': 
             bot.send_message(message.chat.id, 'Привет, мой господин') 
-        elif message.text == 'Пока': 
+        elif message.text.lower() == 'пока': 
             bot.send_message(message.chat.id, 'Прощай, господин')
-        elif message.text == 'че напомнишь?':
+        elif message.text.lower() == 'че напомнишь?':
             bot.send_message(message.chat.id, checkTasks(message.chat.id))	
-        elif message.text == 'Бот, ты сука': 
-                bot.send_photo(message.chat.id, open('putch\mem.jpg', 'rb') )
-        else:
-				#print ("hueta")
+        elif 'ты сука' in message.text.lower(): 
+                bot.send_photo(message.chat.id, open('mem.jpg', 'rb') )
+        elif 'напомни' in message.text.lower():
                 get = message.text # получаем текст
                 text = get+' ' # добавляем в конец пробел, чтобы отрабатывать уведомления типа "напомнить мне через 10 минут". Если бы пробела не было, параметр clock был бы пуст. В параметре clock после слова "час" тоже стоит пробел, чтобы различать поиск "час" и "часов".
                 find = re.findall('ерез [0-9]+|В [0-9:-]+|в [0-9:-]+|ерез час',text)
@@ -112,7 +121,18 @@ def send_text(message):
                                 wors = {'Через %s %s' % (what[1],delclock):'','через %s %s' % (what[1],delclock):'','В %s ' % what[1]:'','в %s ' % what[1]:'', '%s' % delday:'', 'Через час':'', 'через час':'', '%s' % delwhatdate:'',} # какие слова мы будем удалять
                                 x = replace_all(what[0], reps) # это время, на которое запланировано появление напоминания
                                 out = replace_all(text, wors) # это текст напоминания
-                                add_task(out, x, message.chat.id)
+                                try:
+                                    add_task(out, x, message.chat.id)
+                                    bot.send_message(message.chat.id, "Окей")
+                                except:
+                                    bot.send_message(message.chat.id,"Не получилось")
+                        else:
+                            bot.send_message(message.chat.id,"Время указано как-то не так")
+                else:
+                    bot.send_message(message.chat.id,"Что-то не то")
+        else:
+            bot.send_message(message.chat.id,"Не знаю, что на это ответить")
 
 
 bot.polling()
+
