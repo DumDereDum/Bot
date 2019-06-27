@@ -48,8 +48,9 @@ def get_clock(text):
         delclock = clock[0]
     return (how, delclock)
 
-def add_task(out, x):
-    print (x)
+def add_task(out, x, id):
+    cmd = 'echo "task %s %s" | %s' % (out, id, x)
+    subprocess.Popen(cmd, shell=True)
 
 #apihelper.proxy = {'https':'socks5h://45.55.106.89:80'}
 bot = telebot.TeleBot('625199341:AAGuM7KLOKHGUHKv1Xo0-htS8pDu0IUedic')
@@ -88,7 +89,7 @@ def send_text(message):
 								wors = {'Через %s %s' % (what[1],delclock):'','через %s %s' % (what[1],delclock):'','В %s ' % what[1]:'','в %s ' % what[1]:'', '%s' % delday:'', 'Через час':'', 'через час':'', '%s' % delwhatdate:'',} # какие слова мы будем удалять
 								x = replace_all(what[0], reps) # это время, на которое запланировано появление напоминания
 								out = replace_all(text, wors) # это текст напоминания
-								add_task(out, x)
+								add_task(out, x, message.chat.id)
 
 
 bot.polling()
